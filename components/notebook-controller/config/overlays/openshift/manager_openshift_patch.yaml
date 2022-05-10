@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          env:
+            - name: ADD_FSGROUP
+              valueFrom:
+                configMapKeyRef:
+                  name: config
+                  key: ADD_FSGROUP
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 500m
+              memory: 256Mi
