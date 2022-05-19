@@ -19,5 +19,6 @@ configMapGenerator:
       - USE_ISTIO=false
       - ADD_FSGROUP=false
 patchesStrategicMerge:
+  - remove_namespace_patch.yaml
   - manager_openshift_patch.yaml
   - manager_service_openshift_patch.yaml
