@@ -13,6 +13,9 @@ K8S_NAMESPACE = odh-notebook-controller-system
 WEBHOOK_PORT = 8443
 WEBHOOK_CERT_DIR = /tmp/k8s-webhook-server/serving-certs
 
+# E2E tests additional flags
+E2E_TEST_FLAGS = "--skip-deletion=false" # See README.md
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set).
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -155,6 +158,10 @@ undeploy: setup undeploy-kf ## Undeploy controller from the Openshift cluster.
 .PHONY: undeploy-dev
 undeploy-dev: setup undeploy-kf ## Undeploy controller from the Openshift cluster.
 	$(KUSTOMIZE) build config/development | kubectl delete --ignore-not-found=true -f -
+
+.PHONY: e2e-test
+e2e-test: ## Run e2e tests for the controller
+	go test ./e2e/ -run ^TestE2ENotebookController -v --nb-namespace=${K8S_NAMESPACE} ${E2E_TEST_FLAGS}
 
 ##@ Build Dependencies
 

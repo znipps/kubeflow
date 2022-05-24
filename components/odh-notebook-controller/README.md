@@ -116,3 +116,35 @@ Deploy the manager using the image in your registry:
 ```shell
 make deploy -e K8S_NAMESPACE=<YOUR_NAMESPACE> -e IMG=<YOUR_IMAGE>
 ```
+
+### Run e2e Tests
+
+A user can run the e2e tests in the same namespace as the controllers. To deploy 
+kubeflow notebook controller and ODH Notebook controller refer to [this](#run-locally) section. The
+following environment variables must be set when running locally:
+
+```shell
+export KUBECONFIG=/path/to/kubeconfig
+```
+
+Once the above variables are set, run the following:
+
+```shell
+make e2e-test -e K8S_NAMESPACE=<YOUR_NAMESPACE>
+```
+
+Additional flags that can be passed to e2e-tests by setting up `E2E_TEST_FLAGS`
+variable. Following table lists all the available flags to run the tests:
+
+| Flag            | Description                                                                                                                                         | Default value |
+|-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| --skip-deletion | To skip running  of `notebook-deletion` test that includes deleting `Notebook` resources. Assign this variable to `true` to skip Notebook deletion. | false         |
+
+
+
+Example command to run full test suite in a custom namespace, skipping the test
+for Notebook deletion.
+
+```shell
+make e2e-test -e K8S_NAMESPACE=<YOUR_NAMESPACE> -e E2E_TEST_FLAGS="--skip-deletion=true"
+```
