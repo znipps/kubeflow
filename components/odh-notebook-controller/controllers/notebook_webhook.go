@@ -69,7 +69,7 @@ func InjectOAuthProxy(notebook *nbv1.Notebook, oauth OAuthConfig) error {
 			"--email-domain=*",
 			"--skip-provider-button",
 			`--openshift-sar={"verb":"get","resource":"notebooks","resourceAPIGroup":"kubeflow.org",` +
-				`"name":"` + notebook.Name + `","namespace":"$(NAMESPACE)"}`,
+				`"resourceName":"` + notebook.Name + `","namespace":"$(NAMESPACE)"}`,
 		},
 		Ports: []corev1.ContainerPort{{
 			Name:          OAuthServicePortName,
