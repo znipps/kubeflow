@@ -50,7 +50,7 @@ flag in the OAuth proxy:
     "verb":"get",
     "resource":"notebooks",
     "resourceAPIGroup":"kubeflow.org",
-    "name":"example",
+    "resourceName":"example",
     "namespace":"opendatahub"
 }
 ```

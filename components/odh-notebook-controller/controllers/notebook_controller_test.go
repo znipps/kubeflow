@@ -253,7 +253,7 @@ var _ = Describe("The Openshift Notebook controller", func() {
 									"--email-domain=*",
 									"--skip-provider-button",
 									`--openshift-sar={"verb":"get","resource":"notebooks","resourceAPIGroup":"kubeflow.org",` +
-										`"name":"` + Name + `","namespace":"$(NAMESPACE)"}`,
+										`"resourceName":"` + Name + `","namespace":"$(NAMESPACE)"}`,
 								},
 								Ports: []corev1.ContainerPort{{
 									Name:          OAuthServicePortName,
