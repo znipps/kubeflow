@@ -13,6 +13,24 @@ spec:
                 configMapKeyRef:
                   name: config
                   key: ADD_FSGROUP
+            - name: ENABLE_CULLING
+              valueFrom:
+                configMapKeyRef:
+                  name: notebook-controller-culler-config
+                  key: ENABLE_CULLING
+                  optional: true
+            - name: CULL_IDLE_TIME
+              valueFrom:
+                configMapKeyRef:
+                  name: notebook-controller-culler-config
+                  key: CULL_IDLE_TIME
+                  optional: true
+            - name: IDLENESS_CHECK_PERIOD
+              valueFrom:
+                configMapKeyRef:
+                  name: notebook-controller-culler-config
+                  key: IDLENESS_CHECK_PERIOD
+                  optional: true
           resources:
             limits:
               cpu: 500m
