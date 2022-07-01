@@ -33,4 +33,3 @@ docker-push:
 push: build
 	gcloud docker -- push $(IMG):$(TAG)
 	@echo Pushed $(IMG) with  :$(TAG) tags
-
