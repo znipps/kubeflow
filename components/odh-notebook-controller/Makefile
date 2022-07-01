@@ -181,4 +181,4 @@ envtest: ## Download setup-envtest locally if necessary.
 KTUNNEL = $(LOCALBIN)/ktunnel
 .PHONY: ktunnel
 ktunnel: ## Download ktunnel locally if necessary.
-	GOBIN=$(LOCALBIN) go install github.com/omrikiei/ktunnel@v1.4.7
+	GOBIN=$(LOCALBIN) go install github.com/omrikiei/ktunnel@v1.4.8
