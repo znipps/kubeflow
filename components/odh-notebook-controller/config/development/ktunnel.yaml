@@ -31,7 +31,7 @@ spec:
     spec:
       containers:
         - name: ktunnel
-          image: quay.io/omrikiei/ktunnel:v1.4.7
+          image: quay.io/omrikiei/ktunnel:v1.4.8
           imagePullPolicy: IfNotPresent
           command:
             - /ktunnel/ktunnel
