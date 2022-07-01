@@ -17,21 +17,29 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/go-logr/logr"
 	nbv1 "github.com/kubeflow/kubeflow/components/notebook-controller/api/v1"
+	"github.com/kubeflow/kubeflow/components/notebook-controller/pkg/culler"
 	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	AnnotationInjectOAuth = "notebooks.opendatahub.io/inject-oauth"
+	AnnotationInjectOAuth             = "notebooks.opendatahub.io/inject-oauth"
+	AnnotationValueReconciliationLock = "odh-notebook-controller-lock"
 )
 
 // OpenshiftNotebookReconciler holds the controller configuration.
@@ -43,28 +51,70 @@ type OpenshiftNotebookReconciler struct {
 
 // ClusterRole permissions
 
-// +kubebuilder:rbac:groups=kubeflow.org,resources=notebooks,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kubeflow.org,resources=notebooks,verbs=get;list;watch;patch
 // +kubebuilder:rbac:groups=kubeflow.org,resources=notebooks/status,verbs=get
 // +kubebuilder:rbac:groups=kubeflow.org,resources=notebooks/finalizers,verbs=update
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups="",resources=services;serviceaccounts;secrets,verbs=get;list;watch;create;update;patch
 
+// CompareNotebooks checks if two notebooks are equal, if not return false.
+func CompareNotebooks(nb1 nbv1.Notebook, nb2 nbv1.Notebook) bool {
+	return reflect.DeepEqual(nb1.ObjectMeta.Labels, nb2.ObjectMeta.Labels) &&
+		reflect.DeepEqual(nb1.ObjectMeta.Annotations, nb2.ObjectMeta.Annotations) &&
+		reflect.DeepEqual(nb1.Spec, nb2.Spec)
+}
+
 // OAuthInjectionIsEnabled returns true if the oauth sidecar injection
-// annotation is present in the notebook
-func OAuthInjectionIsEnabled(notebook nbv1.Notebook) bool {
-	if notebook.Annotations[AnnotationInjectOAuth] != "" {
-		result, _ := strconv.ParseBool(notebook.Annotations[AnnotationInjectOAuth])
+// annotation is present in the notebook.
+func OAuthInjectionIsEnabled(meta metav1.ObjectMeta) bool {
+	if meta.Annotations[AnnotationInjectOAuth] != "" {
+		result, _ := strconv.ParseBool(meta.Annotations[AnnotationInjectOAuth])
 		return result
 	} else {
 		return false
 	}
 }
 
-// CompareNotebooks checks if two notebooks are equal, if not return false
-func CompareNotebooks(nb1 nbv1.Notebook, nb2 nbv1.Notebook) bool {
-	return reflect.DeepEqual(nb1.ObjectMeta.Labels, nb2.ObjectMeta.Labels) &&
-		reflect.DeepEqual(nb1.ObjectMeta.Annotations, nb2.ObjectMeta.Annotations) &&
-		reflect.DeepEqual(nb1.Spec, nb2.Spec)
+// ReconciliationLockIsEnabled returns true if the reconciliation lock
+// annotation is present in the notebook.
+func ReconciliationLockIsEnabled(meta metav1.ObjectMeta) bool {
+	if meta.Annotations[culler.STOP_ANNOTATION] != "" {
+		return meta.Annotations[culler.STOP_ANNOTATION] == AnnotationValueReconciliationLock
+	} else {
+		return false
+	}
+}
+
+// RemoveReconciliationLock waits until the image pull secret is mounted in the
+// notebook service account to remove the reconciliation lock annotation.
+func (r *OpenshiftNotebookReconciler) RemoveReconciliationLock(notebook *nbv1.Notebook,
+	ctx context.Context) error {
+	// Wait until the image pull secret is mounted in the notebook service
+	// account
+	retry.OnError(wait.Backoff{
+		Steps:    3,
+		Duration: 1 * time.Second,
+		Factor:   5.0,
+	}, func(error) bool { return true },
+		func() error {
+			serviceAccount := &corev1.ServiceAccount{}
+			if err := r.Get(ctx, types.NamespacedName{
+				Name:      notebook.Name,
+				Namespace: notebook.Namespace,
+			}, serviceAccount); err != nil {
+				return err
+			}
+			if len(serviceAccount.ImagePullSecrets) == 0 {
+				return errors.New("Pull secret not mounted")
+			}
+			return nil
+		},
+	)
+
+	// Remove the reconciliation lock annotation
+	patch := client.RawPatch(types.MergePatchType,
+		[]byte(`{"metadata":{"annotations":{"`+culler.STOP_ANNOTATION+`":null}}}`))
+	return r.Patch(ctx, notebook, patch)
 }
 
 // Reconcile performs the reconciling of the Openshift objects for a Kubeflow
@@ -87,7 +137,7 @@ func (r *OpenshiftNotebookReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	// Create the objects required by the OAuth proxy sidecar (see
 	// notebook_oauth.go file)
-	if OAuthInjectionIsEnabled(*notebook) {
+	if OAuthInjectionIsEnabled(notebook.ObjectMeta) {
 		// Call the OAuth Service Account reconciler
 		err = r.ReconcileOAuthServiceAccount(notebook, ctx)
 		if err != nil {
@@ -114,6 +164,15 @@ func (r *OpenshiftNotebookReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	} else {
 		// Call the route reconciler (see notebook_route.go file)
 		err = r.ReconcileRoute(notebook, ctx)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Remove the reconciliation lock annotation
+	if ReconciliationLockIsEnabled(notebook.ObjectMeta) {
+		log.Info("Removing reconciliation lock")
+		err = r.RemoveReconciliationLock(notebook, ctx)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

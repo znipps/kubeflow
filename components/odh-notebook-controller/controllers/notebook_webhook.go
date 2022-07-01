@@ -21,8 +21,11 @@ import (
 	"net/http"
 
 	nbv1 "github.com/kubeflow/kubeflow/components/notebook-controller/api/v1"
+	"github.com/kubeflow/kubeflow/components/notebook-controller/pkg/culler"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +39,24 @@ type NotebookWebhook struct {
 	Client      client.Client
 	decoder     *admission.Decoder
 	OAuthConfig OAuthConfig
+}
+
+// InjectReconciliationLock injects the kubefllow notebook controller culling
+// stop annotation to explicitly start the notebook pod when the ODH notebook
+// controller finishes the reconciliation. Otherwise a race condition may happen
+// while mounting the notebook service account pull secret into the pod.
+//
+// The ODH notebook controller will remove this annotation when the first
+// reconcilitation is completed (see RemoveReconciliationLock).
+func InjectReconciliationLock(meta *metav1.ObjectMeta) error {
+	if meta.Annotations != nil {
+		meta.Annotations[culler.STOP_ANNOTATION] = AnnotationValueReconciliationLock
+	} else {
+		meta.SetAnnotations(map[string]string{
+			culler.STOP_ANNOTATION: AnnotationValueReconciliationLock,
+		})
+	}
+	return nil
 }
 
 // InjectOAuthProxy injects the OAuth proxy sidecar container in the Notebook
@@ -201,15 +222,23 @@ func (w *NotebookWebhook) Handle(ctx context.Context, req admission.Request) adm
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	if OAuthInjectionIsEnabled(*notebook) {
+	// Inject the the reconciliation lock only on new notebook creation
+	if req.Operation == admissionv1.Create {
+		err = InjectReconciliationLock(&notebook.ObjectMeta)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+	}
+
+	// Inject the OAuth proxy if the annotation is present
+	if OAuthInjectionIsEnabled(notebook.ObjectMeta) {
 		err = InjectOAuthProxy(notebook, w.OAuthConfig)
 		if err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
-	} else {
-		return admission.Allowed("Not injecting OAuth proxy")
 	}
 
+	// Create the mutated notebook object
 	marshaledNotebook, err := json.Marshal(notebook)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
