@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nbv1 "github.com/kubeflow/kubeflow/components/notebook-controller/api/v1"
+	"github.com/kubeflow/kubeflow/components/notebook-controller/pkg/culler"
 )
 
 var _ = Describe("The Openshift Notebook controller", func() {
@@ -215,6 +216,7 @@ var _ = Describe("The Openshift Notebook controller", func() {
 				Annotations: map[string]string{
 					"notebooks.opendatahub.io/inject-oauth": "true",
 					"notebooks.opendatahub.io/foo":          "bar",
+					"kubeflow-resource-stopped":             "odh-notebook-controller-lock",
 				},
 			},
 			Spec: nbv1.NotebookSpec{
@@ -352,6 +354,19 @@ var _ = Describe("The Openshift Notebook controller", func() {
 
 			By("By checking that the webhook has injected the sidecar container")
 			Expect(CompareNotebooks(*notebook, expectedNotebook)).Should(BeTrue())
+		})
+
+		It("Should remove the reconciliation lock annotation", func() {
+			By("By checking that the annotation lock annotation is not present")
+			delete(expectedNotebook.Annotations, culler.STOP_ANNOTATION)
+			Eventually(func() bool {
+				key := types.NamespacedName{Name: Name, Namespace: Namespace}
+				err := cli.Get(ctx, key, notebook)
+				if err != nil {
+					return false
+				}
+				return CompareNotebooks(*notebook, expectedNotebook)
+			}, timeout, interval).Should(BeTrue())
 		})
 
 		It("Should reconcile the Notebook when modified", func() {
