@@ -137,4 +137,3 @@ kubectl edit deployment profiles-deployment -n=kubeflow
 ```sh
 make run
 ```
-
