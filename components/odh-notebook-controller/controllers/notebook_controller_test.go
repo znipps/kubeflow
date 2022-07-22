@@ -180,8 +180,9 @@ var _ = Describe("The Openshift Notebook controller", func() {
 					"app.kubernetes.io/instance": Name,
 				},
 				Annotations: map[string]string{
-					"notebooks.opendatahub.io/inject-oauth": "true",
-					"notebooks.opendatahub.io/foo":          "bar",
+					"notebooks.opendatahub.io/inject-oauth":     "true",
+					"notebooks.opendatahub.io/foo":              "bar",
+					"notebooks.opendatahub.io/oauth-logout-url": "https://example.notebook-url/notebook/" + Namespace + "/" + Name,
 				},
 			},
 			Spec: nbv1.NotebookSpec{
@@ -214,9 +215,10 @@ var _ = Describe("The Openshift Notebook controller", func() {
 					"app.kubernetes.io/instance": Name,
 				},
 				Annotations: map[string]string{
-					"notebooks.opendatahub.io/inject-oauth": "true",
-					"notebooks.opendatahub.io/foo":          "bar",
-					"kubeflow-resource-stopped":             "odh-notebook-controller-lock",
+					"notebooks.opendatahub.io/inject-oauth":     "true",
+					"notebooks.opendatahub.io/foo":              "bar",
+					"notebooks.opendatahub.io/oauth-logout-url": "https://example.notebook-url/notebook/" + Namespace + "/" + Name,
+					"kubeflow-resource-stopped":                 "odh-notebook-controller-lock",
 				},
 			},
 			Spec: nbv1.NotebookSpec{
@@ -256,6 +258,7 @@ var _ = Describe("The Openshift Notebook controller", func() {
 									"--skip-provider-button",
 									`--openshift-sar={"verb":"get","resource":"notebooks","resourceAPIGroup":"kubeflow.org",` +
 										`"resourceName":"` + Name + `","namespace":"$(NAMESPACE)"}`,
+									"--logout-url=https://example.notebook-url/notebook/" + Namespace + "/" + Name,
 								},
 								Ports: []corev1.ContainerPort{{
 									Name:          OAuthServicePortName,
