@@ -40,6 +40,7 @@ import (
 const (
 	AnnotationInjectOAuth             = "notebooks.opendatahub.io/inject-oauth"
 	AnnotationValueReconciliationLock = "odh-notebook-controller-lock"
+	AnnotationLogoutUrl               = "notebooks.opendatahub.io/oauth-logout-url"
 )
 
 // OpenshiftNotebookReconciler holds the controller configuration.
