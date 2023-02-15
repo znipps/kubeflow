@@ -429,7 +429,6 @@ var _ = Describe("The Openshift Notebook controller", func() {
 									"--tls-key=/etc/tls/private/tls.key",
 									"--upstream=http://localhost:8888",
 									"--upstream-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
-									"--skip-auth-regex=^(?:/notebook/$(NAMESPACE)/" + notebook.Name + ")?/api$",
 									"--email-domain=*",
 									"--skip-provider-button",
 									`--openshift-sar={"verb":"get","resource":"notebooks","resourceAPIGroup":"kubeflow.org",` +
