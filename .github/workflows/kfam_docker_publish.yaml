@@ -6,6 +6,7 @@ on:
       - v*-branch
     paths:
       - components/access-management/**
+      - releasing/version/VERSION
   pull_request:
     branches:
       - master
@@ -20,6 +21,13 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v3
+
+    - uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        filters: |
+          version:
+            - 'releasing/version/VERSION'
 
     - name: Login to DockerHub
       if: github.event_name == 'push'
@@ -39,4 +47,14 @@ jobs:
       run: |
         cd components/access-management
         export IMG=kubeflownotebookswg/kfam
+        make docker-push
+
+    - name: Run KFAM push on Version change
+      id: version
+      if: github.event_name == 'push' && steps.filter.outputs.version == 'true'
+      run: |
+        export TAG=$(cat releasing/version/VERSION)
+        cd components/access-management
+        export IMG=kubeflownotebookswg/kfam
+        make docker-build
         make docker-push

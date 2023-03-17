@@ -130,11 +130,10 @@ In order for the custom Notebook Controller to be functional from your local mac
 
 1. Set the number of replicas to zero:
 ```sh
-kubectl edit deployment profiles-controller-deployment -n=kubeflow
+kubectl edit deployment profiles-deployment -n=kubeflow
 ```
 
 2. Start the manager locally:
 ```sh
 make run
 ```
-

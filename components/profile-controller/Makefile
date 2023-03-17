@@ -35,7 +35,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-	
+
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -57,7 +57,7 @@ build: generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./main.go -namespace-labels-path ./config/base/namespace-labels.yaml 
+	go run ./main.go -namespace-labels-path ./config/base/namespace-labels.yaml
 
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.

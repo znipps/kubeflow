@@ -1,5 +1,5 @@
 IMG ?= centraldashboard
-TAG := $(shell git describe --tags --always --dirty)
+TAG ?= $(shell git describe --tags --always --dirty)
 COMMIT = $(shell git rev-parse HEAD)
 
 
@@ -33,4 +33,3 @@ docker-push:
 push: build
 	gcloud docker -- push $(IMG):$(TAG)
 	@echo Pushed $(IMG) with  :$(TAG) tags
-
