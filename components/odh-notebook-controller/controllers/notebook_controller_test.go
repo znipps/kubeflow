@@ -17,7 +17,9 @@ package controllers
 
 import (
 	"context"
+	"io/ioutil"
 	netv1 "k8s.io/api/networking/v1"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -188,6 +190,13 @@ var _ = Describe("The Openshift Notebook controller", func() {
 		}
 
 		npProtocol := corev1.ProtocolTCP
+		testPodNamespace := Namespace
+		if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+			if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
+				testPodNamespace = ns
+			}
+		}
+
 		expectedNotebookNetworkPolicy := netv1.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      notebook.Name + "-ctrl-np",
@@ -212,10 +221,10 @@ var _ = Describe("The Openshift Notebook controller", func() {
 						From: []netv1.NetworkPolicyPeer{
 							{
 								// Since for unit tests we do not have context,
-								// namespace will fallback to default which is `redhat-ods-applications` namespace
+								// namespace will fallback to test pod namespace if run in CI or default if run locally
 								NamespaceSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{
-										"kubernetes.io/metadata.name": "redhat-ods-applications",
+										"kubernetes.io/metadata.name": testPodNamespace,
 									},
 								},
 							},
