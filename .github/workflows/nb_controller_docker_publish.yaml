@@ -8,13 +8,11 @@ on:
       - components/notebook-controller/**
       - components/common/**
       - releasing/version/VERSION
-  pull_request:
-    branches:
-      - master
-      - v*-branch
-    paths:
-      - components/notebook-controller/**
-      - components/common/**
+
+env:
+  DOCKER_USER: kubeflownotebookswg
+  IMG: kubeflownotebookswg/notebook-controller
+  ARCH: linux/ppc64le,linux/amd64
 
 jobs:
   push_to_registry:
@@ -32,31 +30,35 @@ jobs:
             - 'releasing/version/VERSION'
 
     - name: Login to DockerHub
-      if: github.event_name == 'push'
       uses: docker/login-action@v2
       with:
-        username: kubeflownotebookswg
+        username: ${{ env.DOCKER_USER }}
         password: ${{ secrets.KUBEFLOWNOTEBOOKSWG_DOCKER_TOKEN }}
 
-    - name: Run Notebook Controller build
+    - name: Setup QEMU
+      uses: docker/setup-qemu-action@v2
+      with:
+        platforms: ppc64le
+
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build and push multi-arch docker image
       run: |
         cd components/notebook-controller
-        export IMG=kubeflownotebookswg/notebook-controller
-        make docker-build
+        make docker-build-push-multi-arch
 
-    - name: Run Notebook Controller push
-      if: github.event_name == 'push'
+    - name: Build and push latest multi-arch docker image
+      if: github.ref == 'refs/heads/master'
       run: |
+        export TAG=latest
         cd components/notebook-controller
-        export IMG=kubeflownotebookswg/notebook-controller
-        make docker-push
+        make docker-build-push-multi-arch
 
-    - name: Run Notebook Controller push on Version change
+    - name: Build and push multi-arch docker image on Version change
       id: version
-      if: github.event_name == 'push' && steps.filter.outputs.version == 'true'
+      if: steps.filter.outputs.version == 'true'
       run: |
         export TAG=$(cat releasing/version/VERSION)
         cd components/notebook-controller
-        export IMG=kubeflownotebookswg/notebook-controller
-        make docker-build
-        make docker-push
+        make docker-build-push-multi-arch
