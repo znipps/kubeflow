@@ -75,6 +75,13 @@ type CullingReconciler struct {
 	Metrics *metrics.Metrics
 }
 
+// Each terminal of the Notebook Server has a status.
+// TerminalStatus struct:
+type TerminalStatus struct {
+	Name         string `json:"name"`
+	LastActivity string `json:"last_activity"`
+}
+
 func (r *CullingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("culler", req.NamespacedName)
 	log.Info("Reconciliation loop started")
@@ -199,20 +206,19 @@ func notebookIsIdle(meta metav1.ObjectMeta, log logr.Logger) bool {
 	return false
 }
 
-func getNotebookApiKernels(nm, ns string, log logr.Logger) []KernelStatus {
-	// Get the Kernels' status from the Server's `/api/kernels` endpoint
+func getNotebookResourceResponse(nm, ns string, resource string, log logr.Logger) *http.Response {
 	client := &http.Client{
 		Timeout: time.Second * 10,
 	}
 
 	domain := GetEnvDefault("CLUSTER_DOMAIN", DEFAULT_CLUSTER_DOMAIN)
 	url := fmt.Sprintf(
-		"http://%s.%s.svc.%s/notebook/%s/%s/api/kernels",
-		nm, ns, domain, ns, nm)
+		"http://%s.%s.svc.%s/notebook/%s/%s/api/%s",
+		nm, ns, domain, ns, nm, resource)
 	if GetEnvDefault("DEV", DEFAULT_DEV) != "false" {
 		url = fmt.Sprintf(
-			"http://localhost:8001/api/v1/namespaces/%s/services/%s:http-%s/proxy/notebook/%s/%s/api/kernels",
-			ns, nm, nm, ns, nm)
+			"http://localhost:8001/api/v1/namespaces/%s/services/%s:http-%s/proxy/notebook/%s/%s/api/%s",
+			ns, nm, nm, ns, nm, resource)
 	}
 
 	resp, err := client.Get(url)
@@ -222,22 +228,54 @@ func getNotebookApiKernels(nm, ns string, log logr.Logger) []KernelStatus {
 	}
 
 	// Decode the body
-	defer resp.Body.Close()
+
 	if resp.StatusCode != 200 {
 		log.Info(fmt.Sprintf(
 			"Warning: GET to %s: %d", url, resp.StatusCode))
 		return nil
 	}
 
+	return resp
+}
+
+// Kernels culling logic
+func getNotebookApiKernels(nm, ns string, log logr.Logger) []KernelStatus {
+	// Get the Kernels' status from the Server's `/api/kernels` endpoint
+	resp := getNotebookResourceResponse(nm, ns, "kernels", log)
+	if resp == nil {
+		return nil
+	}
+
 	var kernels []KernelStatus
 
-	err = json.NewDecoder(resp.Body).Decode(&kernels)
+	defer resp.Body.Close()
+	err := json.NewDecoder(resp.Body).Decode(&kernels)
 	if err != nil {
 		log.Error(err, "Error parsing JSON response for Notebook API Kernels.")
 		return nil
 	}
 
 	return kernels
+}
+
+// Terminals culling logic
+func getNotebookApiTerminals(nm, ns string, log logr.Logger) []TerminalStatus {
+	// Get the Terminals' status from the Server's `/api/terminals` endpoint
+	resp := getNotebookResourceResponse(nm, ns, "terminals", log)
+	if resp == nil {
+		return nil
+	}
+
+	var terminals []TerminalStatus
+
+	defer resp.Body.Close()
+	err := json.NewDecoder(resp.Body).Decode(&terminals)
+	if err != nil {
+		log.Error(err, "Error parsing JSON response for Notebook API terminals.")
+		return nil
+	}
+
+	return terminals
 }
 
 func allKernelsAreIdle(kernels []KernelStatus, log logr.Logger) bool {
@@ -254,57 +292,125 @@ func allKernelsAreIdle(kernels []KernelStatus, log logr.Logger) bool {
 	return true
 }
 
-// Update LAST_ACTIVITY_ANNOTATION
-func updateNotebookLastActivityAnnotation(meta *metav1.ObjectMeta, log logr.Logger) {
-
-	log.Info("Updating the last-activity annotation. Checking /api/kernels")
-	nm, ns := meta.GetName(), meta.GetNamespace()
-	kernels := getNotebookApiKernels(nm, ns, log)
-	if kernels == nil {
-		log.Info("Could not GET the kernels status. Will not update last-activity.")
-		return
-	} else if len(kernels) == 0 {
-		log.Info("Notebook has no kernels. Will not update last-activity")
-		return
-	}
-
-	updateTimestampFromKernelsActivity(meta, kernels, log)
-}
-
-func updateTimestampFromKernelsActivity(meta *metav1.ObjectMeta, kernels []KernelStatus, log logr.Logger) {
-
-	if !allKernelsAreIdle(kernels, log) {
-		// At least on kernel is "busy" so the last-activity annotation should
-		// should be the current time.
-		t := createTimestamp()
-		log.Info(fmt.Sprintf("Found a busy kernel. Updating the last-activity to %s", t))
-
-		meta.Annotations[LAST_ACTIVITY_ANNOTATION] = t
-		return
-	}
-
-	// Checking for the most recent kernel last_activity. The LAST_ACTIVITY_ANNOTATION
-	// should be the most recent kernel last-activity among the kernels.
-	recentTime, err := time.Parse(time.RFC3339, kernels[0].LastActivity)
+func getNotebookRecentTime(t []string, api string, log logr.Logger) string {
+	// Checking for the most recent resource last_activity. The LAST_ACTIVITY_ANNOTATION
+	// should be the most recent resource last-activity among the kernels and terminals.
+	recentTime, err := time.Parse(time.RFC3339, t[0])
 	if err != nil {
 		log.Error(err, "Error parsing the last-activity from the /api/kernels")
-		return
+		return ""
 	}
 
-	for i := 1; i < len(kernels); i++ {
-		kernelLastActivity, err := time.Parse(time.RFC3339, kernels[i].LastActivity)
+	for i := 1; i < len(t); i++ {
+		kernelLastActivity, err := time.Parse(time.RFC3339, t[i])
 		if err != nil {
-			log.Error(err, "Error parsing the last-activity from the /api/kernels")
-			return
+			log.Error(err, "Error parsing the last-activity from the %s", api)
+			return ""
 		}
 		if kernelLastActivity.After(recentTime) {
 			recentTime = kernelLastActivity
 		}
 	}
-	t := recentTime.Format(time.RFC3339)
+	return recentTime.Format(time.RFC3339)
+}
+
+// Update LAST_ACTIVITY_ANNOTATION
+func updateNotebookLastActivityAnnotation(meta *metav1.ObjectMeta, log logr.Logger) bool {
+
+	log.Info("Updating the last-activity annotation. Checking /api/kernels")
+	nm, ns := meta.GetName(), meta.GetNamespace()
+
+	kernels := getNotebookApiKernels(nm, ns, log)
+	log.Info("last-activity annotation exists. Checking /api/terminals")
+	terminals := getNotebookApiTerminals(nm, ns, log)
+	if kernels == nil && terminals == nil {
+		log.Info("Could not GET the notebook status. Will not update last-activity.")
+		return false
+	}
+
+	kernelsBool := updateTimestampFromKernelsActivity(meta, kernels, log)
+	terminalsBool := updateTimestampFromTerminalsActivity(meta, terminals, log)
+	return kernelsBool || terminalsBool
+
+}
+
+func compareAnnotationTimeToResource(meta *metav1.ObjectMeta, resourceTime string, log logr.Logger) bool {
+
+	annotationTime, err := time.Parse(time.RFC3339, meta.GetAnnotations()[LAST_ACTIVITY_ANNOTATION])
+	if err != nil {
+		log.Error(err, "Error parsing the last-activity from the notebook CRD")
+		return false
+	}
+	t, err := time.Parse(time.RFC3339, resourceTime)
+	if err != nil {
+		log.Error(err, "Error parsing the last-activity from the resource return time")
+		return false
+	}
+	// If the resource time is less than the annotation time on the resource return false
+	if annotationTime.After(t) {
+		return false
+	}
+
+	return true
+}
+
+func updateTimestampFromKernelsActivity(meta *metav1.ObjectMeta, kernels []KernelStatus, log logr.Logger) bool {
+
+	if kernels == nil || len(kernels) == 0 {
+		log.Info("Notebook has no kernels. Will not update last-activity")
+		return false
+	}
+
+	if !allKernelsAreIdle(kernels, log) {
+		// At least one kernel is "busy" so the last-activity annotation should
+		// should be the current time.
+		t := createTimestamp()
+		log.Info(fmt.Sprintf("Found a busy kernel. Updating the last-activity to %s", t))
+
+		meta.Annotations[LAST_ACTIVITY_ANNOTATION] = t
+		return false
+	}
+
+	arr := make([]string, len(kernels))
+	for i := 0; i < len(kernels); i++ {
+		arr[i] = kernels[i].LastActivity
+	}
+
+	t := getNotebookRecentTime(arr, "api/kernels", log)
+	log.Info(fmt.Sprintf("Comparing api/kernels last_activity time to current notebook annotation time"))
+	if t == "" || !compareAnnotationTimeToResource(meta, t, log) {
+		return false
+	}
 
 	meta.Annotations[LAST_ACTIVITY_ANNOTATION] = t
 	log.Info(fmt.Sprintf("Successfully updated last-activity from latest kernel action, %s", t))
+	return true
+}
+
+func updateTimestampFromTerminalsActivity(meta *metav1.ObjectMeta, terminals []TerminalStatus, log logr.Logger) bool {
+	// check the latest_activity timestamp from the `api/terminals` jupyter api. also
+	// check this timestamp against the current annotation timestamp to ensure we are not
+	// going backwards in time.
+
+	if terminals == nil || len(terminals) == 0 {
+		log.Info("Notebook has no terminals. Will not update last-activity")
+		return false
+	}
+
+	arr := make([]string, len(terminals))
+	for i := 0; i < len(terminals); i++ {
+		arr[i] = terminals[i].LastActivity
+	}
+
+	t := getNotebookRecentTime(arr, "api/terminals", log)
+	log.Info(fmt.Sprintf("Comparing api/terminals last_activity time to current notebook annotation time"))
+	if t == "" || !compareAnnotationTimeToResource(meta, t, log) {
+		return false
+	}
+
+	meta.Annotations[LAST_ACTIVITY_ANNOTATION] = t
+	log.Info(fmt.Sprintf("Successfully updated last-activity from latest terminal action, %s", t))
+	return true
 }
 
 func updateLastCullingCheckTimestampAnnotation(meta *metav1.ObjectMeta, log logr.Logger) {
