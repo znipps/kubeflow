@@ -40,19 +40,19 @@ spec:
           - name: ENABLE_CULLING
             valueFrom:
               configMapKeyRef:
-                name: config
+                name: notebook-controller-culler-config
                 key: ENABLE_CULLING
           - name: CULL_IDLE_TIME
             valueFrom:
               configMapKeyRef:
-                name: config
+                name: notebook-controller-culler-config
                 key: CULL_IDLE_TIME
           - name: IDLENESS_CHECK_PERIOD
             valueFrom:
               configMapKeyRef:
-                name: config
+                name: notebook-controller-culler-config
                 key: IDLENESS_CHECK_PERIOD
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
