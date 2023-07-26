@@ -392,24 +392,10 @@ func generateStatefulSet(instance *v1beta1.Notebook) *appsv1.StatefulSet {
 	}
 
 	podSpec := &ss.Spec.Template.Spec
-	podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
-		Name: "shm",
-		VolumeSource: corev1.VolumeSource{
-		EmptyDir: &corev1.EmptyDirVolumeSource{
-			Medium: corev1.StorageMediumMemory,
-			},
-		},
-	})
-	
-	
 	container := &podSpec.Containers[0]
 	if container.WorkingDir == "" {
 		container.WorkingDir = "/home/jovyan"
 	}
-	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
-		Name: "shm",
-		MountPath: "/dev/shm",
-	})
 	if container.Ports == nil {
 		container.Ports = []corev1.ContainerPort{
 			{
