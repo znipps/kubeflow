@@ -19,9 +19,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-
 	configv1 "github.com/openshift/api/config/v1"
+	"net/http"
 
 	nbv1 "github.com/kubeflow/kubeflow/components/notebook-controller/api/v1"
 	"github.com/kubeflow/kubeflow/components/notebook-controller/pkg/culler"
@@ -92,6 +91,7 @@ func InjectOAuthProxy(notebook *nbv1.Notebook, oauth OAuthConfig) error {
 			"--upstream=http://localhost:8888",
 			"--upstream-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
 			"--email-domain=*",
+			"--skip-provider-button",
 			`--openshift-sar={"verb":"get","resource":"notebooks","resourceAPIGroup":"kubeflow.org",` +
 				`"resourceName":"` + notebook.Name + `","namespace":"$(NAMESPACE)"}`,
 		},

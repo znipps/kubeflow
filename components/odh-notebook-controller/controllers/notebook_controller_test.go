@@ -439,6 +439,7 @@ var _ = Describe("The Openshift Notebook controller", func() {
 									"--upstream=http://localhost:8888",
 									"--upstream-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
 									"--email-domain=*",
+									"--skip-provider-button",
 									`--openshift-sar={"verb":"get","resource":"notebooks","resourceAPIGroup":"kubeflow.org",` +
 										`"resourceName":"` + Name + `","namespace":"$(NAMESPACE)"}`,
 									"--logout-url=https://example.notebook-url/notebook/" + Namespace + "/" + Name,
