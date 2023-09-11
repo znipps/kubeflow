@@ -6,3 +6,5 @@ configMapGenerator:
 - name: config
   envs:
   - params.env
+generatorOptions:
+  disableNameSuffixHash: true
