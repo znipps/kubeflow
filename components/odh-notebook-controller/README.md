@@ -32,7 +32,7 @@ metadata:
 A [mutating webhook](./controllers/notebook_webhook.go) is part of the ODH
 notebook controller, it will add the sidecar to the notebook deployment. The
 controller will create all the objects needed by the proxy as explained in the
-follow diagram:
+following diagram:
 
 ![ODH Notebook Controller OAuth injection
 diagram](./assets/odh-notebook-controller-oauth-diagram.png)
