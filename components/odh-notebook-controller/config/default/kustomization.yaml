@@ -8,7 +8,7 @@ bases:
   - ../webhook
 
 # Adds namespace to all resources.
-namespace: odh-notebook-controller-system
+namespace: opendatahub
 
 # Value of this field is prepended to the names of all resources, e.g. a
 # deployment named "wordpress" becomes "alices-wordpress". Note that it should
