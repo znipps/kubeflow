@@ -36,11 +36,6 @@ spec:
               configMapKeyRef:
                 name: config
                 key: ISTIO_GATEWAY
-          - name: CLUSTER_DOMAIN
-            valueFrom:
-              configMapKeyRef:
-                name: config
-                key: CLUSTER_DOMAIN
           - name: ENABLE_CULLING
             valueFrom:
               configMapKeyRef:
