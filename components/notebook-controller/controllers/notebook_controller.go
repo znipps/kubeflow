@@ -51,6 +51,7 @@ const DefaultContainerPort = 8888
 const DefaultServingPort = 80
 const AnnotationRewriteURI = "notebooks.kubeflow.org/http-rewrite-uri"
 const AnnotationHeadersRequestSet = "notebooks.kubeflow.org/http-headers-request-set"
+const AnnotationNotebookRestart = "notebooks.opendatahub.io/notebook-restart"
 
 const PrefixEnvVar = "NB_PREFIX"
 
@@ -219,6 +220,43 @@ func (r *NotebookReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	err = updateNotebookStatus(r, instance, foundStateful, foundPod, req)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+
+	// Check if annotations for the Notebook instance imply a requirement for notebook restart.
+	// This annotation is supposed to be added once a ConfigMap used in the notebook is added/updated.
+
+	annotations := instance.GetAnnotations()
+	notebookRestart, ok := annotations[AnnotationNotebookRestart]
+
+	if ok && notebookRestart == "true" {
+
+		log.Info("Annotation restart-pod is set, working on restarting the pod")
+
+		// find the pod associated with the notebook instance
+		foundPod := &corev1.Pod{}
+		err = r.Get(ctx, types.NamespacedName{Name: instance.Name + "-0", Namespace: instance.Namespace}, foundPod)
+		if err != nil && apierrs.IsNotFound(err) {
+			log.Info(fmt.Sprintf("No Pods are currently running for Notebook Server: %s in namesace: %s.", instance.Name, instance.Namespace))
+		} else if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// delete the pod associated with the notebook instance so it can be restarted
+		err = r.Delete(context.TODO(), foundPod)
+		if err != nil {
+			return ctrl.Result{}, err
+		} else {
+			// remove the "notebook-restart" annotation so that no restart is triggered for peristing notebook-restart annotations
+			delete(annotations, AnnotationNotebookRestart)
+
+			log.Info("Pod has been restarted, working on resetting annotations of the Notebook")
+			instance.SetAnnotations(annotations)
+
+			err = r.Update(ctx, instance)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 
 	return ctrl.Result{}, nil
