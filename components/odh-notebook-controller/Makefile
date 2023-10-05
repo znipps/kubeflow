@@ -4,7 +4,7 @@ IMG ?= quay.io/opendatahub/odh-notebook-controller
 TAG ?= $(shell git describe --tags --always)
 
 KF_IMG ?= quay.io/opendatahub/kubeflow-notebook-controller
-KF_TAG ?= 1.6-9ae9413
+KF_TAG ?= 1.7-870980f
 
 CONTAINER_ENGINE ?= podman
 
@@ -139,17 +139,17 @@ setup: manifests kustomize ## Replace Kustomize manifests with your environment 
 .PHONY: setup-service-mesh
 setup-service-mesh: kustomize ## Replace Kustomize manifests with your environment configuration.
 	sed -i'' -e 's,namespace: .*,namespace: '"${K8S_NAMESPACE}"',' \
-			../notebook-controller/config/overlays/service-mesh/smm.yaml
+			../notebook-controller/config/overlays/standalone-service-mesh/smm.yaml
 	sed -i'' -e 's,namespace: .*,namespace: '"${K8S_NAMESPACE}"',' \
-		../notebook-controller/config/overlays/service-mesh/kustomization.yaml
+		../notebook-controller/config/overlays/standalone-service-mesh/kustomization.yaml
 	sed -i'' -e 's,ISTIO_GATEWAY=.*,ISTIO_GATEWAY='"${K8S_NAMESPACE}/odh-gateway"',' \
-    		../notebook-controller/config/overlays/service-mesh/kustomization.yaml
+    		../notebook-controller/config/overlays/standalone-service-mesh/kustomization.yaml
 	sed -i'' -e 's,newName: .*,newName: '"${KF_IMG}"',' \
-		../notebook-controller/config/overlays/service-mesh/kustomization.yaml
+		../notebook-controller/config/overlays/standalone-service-mesh/kustomization.yaml
 	sed -i'' -e 's,newTag: .*,newTag: '"${KF_TAG}"',' \
-	../notebook-controller/config/overlays/service-mesh/kustomization.yaml
+	../notebook-controller/config/overlays/standalone-service-mesh/kustomization.yaml
 	sed -i'' -e 's,host: .*,host: opendatahub.'"$(shell kubectl get ingress.config.openshift.io cluster -o 'jsonpath={.spec.domain}')"',' \
-    	../notebook-controller/config/overlays/service-mesh/gateway-route.yaml
+    	../notebook-controller/config/overlays/standalone-service-mesh/gateway-route.yaml
 
 .PHONY: deploy-service-mesh
 deploy-service-mesh: ## Deploy Service Mesh to the Openshift cluster.
@@ -171,11 +171,11 @@ deploy: setup deploy-kf ## Deploy controller to the Openshift cluster.
 
 .PHONY: deploy-with-mesh
 deploy-with-mesh: setup-service-mesh deploy
-	$(KUSTOMIZE) build ../notebook-controller/config/overlays/service-mesh | oc apply -f -
+	$(KUSTOMIZE) build ../notebook-controller/config/overlays/standalone-service-mesh | oc apply -f -
 
 .PHONY: undeploy-with-mesh
 undeploy-with-mesh: setup-service-mesh undeploy
-	$(KUSTOMIZE) build ../notebook-controller/config/overlays/service-mesh | oc delete --ignore-not-found=true -f -
+	$(KUSTOMIZE) build ../notebook-controller/config/overlays/standalone-service-mesh | oc delete --ignore-not-found=true -f -
 
 .PHONY: deploy-dev
 deploy-dev: setup deploy-kf ## Deploy controller to the Openshift cluster.

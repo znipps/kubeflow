@@ -290,8 +290,8 @@ func (tc *testContext) testNotebookCulling(nbMeta *metav1.ObjectMeta) error {
 		return fmt.Errorf("error rolling out the deployment with culling configuration: %v", err)
 	}
 
-	// Wait for server to shut down after 'CULL_IDLE_TIME' minutes(around 2.5 minutes)
-	time.Sleep(150 * time.Second)
+	// Wait for server to shut down after 'CULL_IDLE_TIME' minutes(around 3 minutes)
+	time.Sleep(180 * time.Second)
 	// Verify that the notebook kernel has shutdown, and the notebook endpoint returns 503
 	resp, err := tc.curlNotebookEndpoint(*nbMeta)
 	if err != nil {
