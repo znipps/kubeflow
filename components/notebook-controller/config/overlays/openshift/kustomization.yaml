@@ -11,7 +11,7 @@ commonLabels:
 images:
   - name: docker.io/kubeflownotebookswg/notebook-controller
     newName: quay.io/opendatahub/kubeflow-notebook-controller
-    newTag: 1.7-870980f
+    newTag: 1.7-9f0db5d
 configMapGenerator:
   - name: config
     behavior: merge
