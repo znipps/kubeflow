@@ -59,8 +59,8 @@ type KernelStatus struct {
 // Each terminal of the Notebook Server has a status.
 // TerminalStatus struct:
 type TerminalStatus struct {
-	Name           string `json:"name"`
-	LastActivity   string `json:"last_activity"`
+	Name         string `json:"name"`
+	LastActivity string `json:"last_activity"`
 }
 
 // Some Utility Functions
@@ -261,7 +261,6 @@ func getNotebookRecentTime(t []string, api string) string {
 	return recentTime.Format(time.RFC3339)
 }
 
-
 // Update LAST_ACTIVITY_ANNOTATION
 func UpdateNotebookLastActivityAnnotation(meta *metav1.ObjectMeta) bool {
 	log := log.WithValues("notebook", getNamespacedNameFromMeta(*meta))
@@ -286,10 +285,10 @@ func UpdateNotebookLastActivityAnnotation(meta *metav1.ObjectMeta) bool {
 	}
 
 	log.Info("last-activity annotation exists. Checking /api/kernels")
-	kernels :=  getNotebookApiKernels(nm, ns)
+	kernels := getNotebookApiKernels(nm, ns)
 	log.Info("last-activity annotation exists. Checking /api/terminals")
-	terminals :=  getNotebookApiTerminals(nm, ns)
-	if kernels == nil  && terminals == nil{
+	terminals := getNotebookApiTerminals(nm, ns)
+	if kernels == nil && terminals == nil {
 		log.Info("Could not GET the notebook status. Will not update last-activity.")
 		return false
 	}

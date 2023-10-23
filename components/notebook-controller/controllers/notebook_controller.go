@@ -80,7 +80,7 @@ type NotebookReconciler struct {
 	EventRecorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;delete
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;patch
 // +kubebuilder:rbac:groups=core,resources=services,verbs="*"
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs="*"
