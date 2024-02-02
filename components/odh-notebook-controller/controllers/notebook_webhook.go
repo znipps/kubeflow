@@ -19,8 +19,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	configv1 "github.com/openshift/api/config/v1"
 	"net/http"
+
+	configv1 "github.com/openshift/api/config/v1"
 
 	nbv1 "github.com/kubeflow/kubeflow/components/notebook-controller/api/v1"
 	"github.com/kubeflow/kubeflow/components/notebook-controller/pkg/culler"
@@ -39,7 +40,7 @@ import (
 // NotebookWebhook holds the webhook configuration.
 type NotebookWebhook struct {
 	Client      client.Client
-	decoder     *admission.Decoder
+	Decoder     *admission.Decoder
 	OAuthConfig OAuthConfig
 }
 
@@ -226,7 +227,7 @@ func InjectOAuthProxy(notebook *nbv1.Notebook, oauth OAuthConfig) error {
 func (w *NotebookWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	notebook := &nbv1.Notebook{}
 
-	err := w.decoder.Decode(req, notebook)
+	err := w.Decoder.Decode(req, notebook)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
@@ -297,7 +298,7 @@ func (w *NotebookWebhook) ClusterWideProxyIsEnabled() bool {
 
 // InjectDecoder injects the decoder.
 func (w *NotebookWebhook) InjectDecoder(d *admission.Decoder) error {
-	w.decoder = d
+	w.Decoder = d
 	return nil
 }
 

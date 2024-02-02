@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	nbv1 "github.com/kubeflow/kubeflow/components/notebook-controller/api/v1"
 	configv1 "github.com/openshift/api/config/v1"
@@ -117,6 +118,7 @@ func main() {
 			OAuthConfig: controllers.OAuthConfig{
 				ProxyImage: oauthProxyImage,
 			},
+			Decoder: admission.NewDecoder(mgr.GetScheme()),
 		},
 	}
 	hookServer.Register("/mutate-notebook-v1", notebookWebhook)
