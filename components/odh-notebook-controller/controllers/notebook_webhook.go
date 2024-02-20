@@ -234,6 +234,11 @@ func (w *NotebookWebhook) Handle(ctx context.Context, req admission.Request) adm
 		if err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
+
+		err = CheckAndMountCACertBundle(ctx, w.Client, notebook)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
 	}
 
 	// Inject the OAuth proxy if the annotation is present but only if Service Mesh is disabled
@@ -259,5 +264,60 @@ func (w *NotebookWebhook) Handle(ctx context.Context, req admission.Request) adm
 // InjectDecoder injects the decoder.
 func (w *NotebookWebhook) InjectDecoder(d *admission.Decoder) error {
 	w.Decoder = d
+	return nil
+}
+
+func CheckAndMountCACertBundle(ctx context.Context, cli client.Client, notebook *nbv1.Notebook) error {
+
+	configMapName := "odh-trusted-ca-bundle"
+
+	// Fetch the list of ConfigMaps from the cluster
+	configMapList := &corev1.ConfigMapList{}
+	if err := cli.List(ctx, configMapList); err != nil {
+		return err
+	}
+
+	// Search for the odh-trusted-ca-bundle ConfigMap
+	for i := range configMapList.Items {
+		cm := &configMapList.Items[i]
+		if cm.Name == configMapName {
+
+			volumeName := "trusted-ca"
+			volumeMountPath := "/etc/pki/ca-trust/extracted/pem"
+			volumeMount := corev1.VolumeMount{
+				Name:      volumeName,
+				MountPath: volumeMountPath,
+				ReadOnly:  true,
+			}
+
+			// Add volume mount to the pod's spec
+			notebook.Spec.Template.Spec.Containers[0].VolumeMounts = append(notebook.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMount)
+
+			// Create volume for mounting the CA certificate from the ConfigMap with key and path
+			configMapVolume := corev1.Volume{
+				Name: volumeName,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name},
+						Optional:             pointer.Bool(true),
+						Items: []corev1.KeyToPath{
+							{
+								Key:  "ca-bundle.crt",
+								Path: "tls-ca-bundle.pem",
+							},
+						},
+					},
+				},
+			}
+
+			// Add volume to the pod's spec
+			notebook.Spec.Template.Spec.Volumes = append(notebook.Spec.Template.Spec.Volumes, configMapVolume)
+
+			return nil
+		}
+	}
+
+	// If specified ConfigMap not found
+	fmt.Printf("%s ConfigMap not found\n", configMapName)
 	return nil
 }
