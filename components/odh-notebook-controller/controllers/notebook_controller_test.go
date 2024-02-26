@@ -157,6 +157,63 @@ var _ = Describe("The Openshift Notebook controller", func() {
 				return cli.Get(ctx, key, notebook)
 			}, duration, interval).Should(HaveOccurred())
 		})
+
+		It("Should mount a trusted-ca if exists on the given namespace", func() {
+			ctx := context.Background()
+
+			By("By simulating the existence of odh-trusted-ca-bundle ConfigMap")
+			// Create a ConfigMap similar to odh-trusted-ca-bundle for simulation
+			trustedCACertBundle := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "odh-trusted-ca-bundle",
+					Namespace: "default",
+					Labels: map[string]string{
+						"config.openshift.io/inject-trusted-cabundle": "true",
+					},
+				},
+				Data: map[string]string{
+					"ca-bundle.crt": "<your CA bundle data here>",
+				},
+			}
+			// Create the ConfigMap
+			Expect(cli.Create(ctx, trustedCACertBundle)).Should(Succeed())
+			defer func() {
+				// Clean up the ConfigMap after the test
+				Expect(cli.Delete(ctx, trustedCACertBundle)).Should(Succeed())
+			}()
+
+			By("By checking and mounting the trusted-ca bundle")
+			// Invoke the function to mount the CA certificate bundle
+			err := CheckAndMountCACertBundle(ctx, cli, notebook)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			// Assert that the volume mount and volume are added correctly
+			volumeMountPath := "/etc/pki/ca-trust/extracted/pem"
+			expectedVolumeMount := corev1.VolumeMount{
+				Name:      "trusted-ca",
+				MountPath: volumeMountPath,
+				ReadOnly:  true,
+			}
+			Expect(notebook.Spec.Template.Spec.Containers[0].VolumeMounts).To(ContainElement(expectedVolumeMount))
+
+			expectedVolume := corev1.Volume{
+				Name: "trusted-ca",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: trustedCACertBundle.Name},
+						Optional:             pointer.Bool(true),
+						Items: []corev1.KeyToPath{
+							{
+								Key:  "ca-bundle.crt",
+								Path: "tls-ca-bundle.pem",
+							},
+						},
+					},
+				},
+			}
+			Expect(notebook.Spec.Template.Spec.Volumes).To(ContainElement(expectedVolume))
+		})
+
 	})
 
 	When("Creating a Notebook, test Networkpolicies", func() {
