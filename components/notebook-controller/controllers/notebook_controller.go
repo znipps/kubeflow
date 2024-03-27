@@ -51,6 +51,7 @@ const DefaultServingPort = 80
 const AnnotationRewriteURI = "notebooks.kubeflow.org/http-rewrite-uri"
 const AnnotationHeadersRequestSet = "notebooks.kubeflow.org/http-headers-request-set"
 const AnnotationNotebookRestart = "notebooks.opendatahub.io/notebook-restart"
+const WorkbenchLabel = "opendatahub.io/workbenches"
 
 const PrefixEnvVar = "NB_PREFIX"
 
@@ -417,6 +418,7 @@ func generateStatefulSet(instance *v1beta1.Notebook) *appsv1.StatefulSet {
 				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
 					"statefulset":   instance.Name,
 					"notebook-name": instance.Name,
+					WorkbenchLabel:  "true",
 				}},
 				Spec: *instance.Spec.Template.Spec.DeepCopy(),
 			},
