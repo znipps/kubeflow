@@ -375,7 +375,7 @@ func (r *OpenshiftNotebookReconciler) UnsetNotebookCertConfig(notebook *nbv1.Not
 	log := r.Log.WithValues("notebook", notebook.Name, "namespace", notebook.Namespace)
 
 	// Get the notebook object
-	envVars := []string{"PIP_CERT", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE", "PIPELINES_SSL_SA_CERTS"}
+	envVars := []string{"PIP_CERT", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE", "PIPELINES_SSL_SA_CERTS", "GIT_SSL_CAINFO"}
 	notebookSpecChanged := false
 	patch := client.MergeFrom(notebook.DeepCopy())
 	copyNotebook := notebook.DeepCopy()
