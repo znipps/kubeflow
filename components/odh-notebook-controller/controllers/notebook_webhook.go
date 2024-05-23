@@ -317,7 +317,7 @@ func CheckAndMountCACertBundle(ctx context.Context, cli client.Client, notebook 
 	cm := workbenchConfigMap
 	if cm.Name == workbenchConfigMapName {
 		// Inject the trusted-ca volume and environment variables
-		log.Info("Injecting trusted-ca volume and environment variables", notebook.Name, "namespace", notebook.Namespace)
+		log.Info("Injecting trusted-ca volume and environment variables")
 		return InjectCertConfig(notebook, workbenchConfigMapName)
 	}
 	return nil
